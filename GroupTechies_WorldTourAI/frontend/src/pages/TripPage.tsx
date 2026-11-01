@@ -1,12 +1,11 @@
 import clsx from 'clsx'
-import { ArrowLeft, Eye, Layers, MessageSquareText, Pencil, Play, Share2, Star, StickyNote, Trash2 } from 'lucide-react'
+import { ArrowLeft, Eye, Layers, Pencil, Play, Quote, Share2, Star, StickyNote, Trash2 } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { MessageContent } from '../components/MessageContent'
 import { PlanReadOnly } from '../components/plan/readOnly'
 import { ShareDialog } from '../components/ShareDialog'
 import { ConfirmDialog } from '../components/ui'
-import { server, type TripSummary } from '../lib/account'
+import { server, useSession, type TripSummary } from '../lib/account'
 import { invalidate, load as loadCached, peek, setCached } from '../lib/cache'
 import { toast } from '../lib/toast'
 import { applySelection, type Selection } from '../lib/selection'
@@ -40,6 +39,7 @@ export function TripPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const loadTrip = useStore((s) => s.loadTrip)
+  const { userId } = useSession()
   const [trip, setTrip] = useState<TripDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [viewing, setViewing] = useState<{ id: string; number: number; plan: Plan } | null>(null)
@@ -100,7 +100,7 @@ export function TripPage() {
   const resume = (plan: Plan | null, selection: Selection | null) => {
     if (!trip) return
     const messages: ChatMessage[] = trip.messages.map((m) => ({ role: m.role, content: m.content, at: m.at }))
-    loadTrip({ id: trip.id, messages, session: trip.session, plan, selection })
+    loadTrip({ id: trip.id, messages, session: trip.session, plan, selection, ownerId: userId })
     navigate('/')
   }
 
@@ -207,18 +207,11 @@ export function TripPage() {
             <p className="mt-1 text-xs text-slate-500">{notes === savedNotes ? 'Saved' : 'Saves when you click outside the box'}</p>
           </Panel>
 
-          <Panel title={<span className="flex items-center gap-2"><MessageSquareText size={16} /> Conversation</span>} description={`${trip.messages.filter((m) => m.role === 'user').length} prompts`}>
-            <div className="max-h-[520px] space-y-3 overflow-y-auto pr-1">
-              {trip.messages.map((m, i) => (
-                <div key={i} className={clsx('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
-                  <div className={clsx('max-w-[90%] rounded-xl px-3 py-2 text-sm leading-relaxed', m.role === 'user' ? 'bg-brand-700 text-white' : 'bg-slate-100 text-slate-800 dark:bg-white/5 dark:text-slate-100')}>
-                    {m.role === 'user' ? m.content : <MessageContent text={m.content} />}
-                    <div className={clsx('mt-1 text-[10px]', m.role === 'user' ? 'text-white/70' : 'text-slate-400')}>{ago(m.at)}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Panel>
+          {trip.firstPrompt && (
+            <Panel title={<span className="flex items-center gap-2"><Quote size={16} /> Original request</span>} description={`Saved ${ago(trip.createdAt)}. This itinerary is shown exactly as it was generated.`}>
+              <p className="text-sm leading-relaxed text-slate-700 dark:text-slate-200">{trip.firstPrompt}</p>
+            </Panel>
+          )}
         </aside>
       </div>
 
@@ -227,7 +220,7 @@ export function TripPage() {
         tone="danger"
         icon={<Trash2 size={20} />}
         title="Delete this trip?"
-        body={<>“{trip.title}”, its conversation and all {trip.versionList.length} itinerary versions will be deleted for good.</>}
+        body={<>The saved itinerary “{trip.title}”{trip.versionList.length > 1 ? ` and its ${trip.versionList.length} versions` : ''} will be deleted for good.</>}
         confirmLabel="Delete trip"
         onCancel={() => setRemoving(false)}
         onConfirm={() => {

@@ -24,8 +24,21 @@ interface State {
   /** The saved trip (server) this conversation belongs to; null until it is saved. */
   tripId: string | null
   setTripId: (id: string | null) => void
+  /** Names this conversation to the server while it is being saved, so a retried save cannot create a second trip. */
+  draftKey: string | null
+  setDraftKey: (key: string | null) => void
+  /**
+   * The Clerk user this conversation belongs to; null is a guest draft. It is only ever saved to that
+   * user's account (see lib/ownershipRules.ts), and cleared when they sign out.
+   */
+  ownerId: string | null
+  setOwner: (ownerId: string | null) => void
+  /** The traveler chose to save the guest draft to their account. */
+  claimDraft: (ownerId: string) => void
+  /** Clear the conversation, plan, picks and saved-trip id (and the access code unless kept); the user signed out or changed. */
+  clearPrivate: (ownerId: string | null, options?: { keepAccessCode?: boolean }) => void
   /** Open a saved trip in the planner to continue it. */
-  loadTrip: (trip: { id: string; messages: ChatMessage[]; session: Session | null; plan: Plan | null; selection: Selection | null }) => void
+  loadTrip: (trip: { id: string; messages: ChatMessage[]; session: Session | null; plan: Plan | null; selection: Selection | null; ownerId?: string | null }) => void
   /** Chat language; the assistant replies in it and voice input listens for it. */
   language: Lang
   setLanguage: (language: Lang) => void
@@ -65,6 +78,12 @@ const PACKAGE_REQUEST = /^(?:please\s+)?(?:switch\s+to\s+|change\s+to\s+|go\s+wi
 
 const now = () => new Date().toISOString()
 
+/**
+ * Bumped whenever the conversation is cleared for a different person. A chat or plan request that was already
+ * on its way then finds the number changed and drops its answer instead of writing it into the next person's chat.
+ */
+let epoch = 0
+
 export const WELCOME: ChatMessage = {
   role: 'assistant',
   content:
@@ -76,13 +95,15 @@ export const useStore = create<State>()(
   persist(
     (set, get) => {
       const plan = async (session: Session) => {
+        const startedAt = epoch
         set({ status: 'planning', events: [], notice: null })
         const result = await runPlan(
           session,
           get().accessCode,
-          (event) => set((s) => ({ events: [...s.events, event] })),
-          () => set({ events: [], notice: 'The connection dropped — restarting the plan…' }),
+          (event) => epoch === startedAt && set((s) => ({ events: [...s.events, event] })),
+          () => epoch === startedAt && set({ events: [], notice: 'The connection dropped — restarting the plan…' }),
         )
+        if (epoch !== startedAt) return
         set((s) => ({
           plan: result.plan,
           selection: null,
@@ -122,9 +143,35 @@ export const useStore = create<State>()(
         setLanguage: (language) => set({ language }),
         tripId: null,
         setTripId: (tripId) => set({ tripId }),
+        draftKey: null,
+        setDraftKey: (draftKey) => set({ draftKey }),
+        ownerId: null,
+        setOwner: (ownerId) => set({ ownerId }),
+        claimDraft: (ownerId) => set({ ownerId }),
+        clearPrivate: (ownerId, options) => {
+          epoch += 1
+          set({
+            messages: [WELCOME],
+            session: null,
+            summary: null,
+            plan: null,
+            selection: null,
+            tripId: null,
+            draftKey: null,
+            events: [],
+            status: 'idle',
+            error: null,
+            notice: null,
+            needsAccessCode: false,
+            ownerId,
+            ...(options?.keepAccessCode ? {} : { accessCode: null }),
+          })
+        },
         loadTrip: (trip) =>
           set({
             tripId: trip.id,
+            draftKey: null,
+            ownerId: trip.ownerId ?? get().ownerId,
             messages: trip.messages.length ? trip.messages : [WELCOME],
             session: trip.session,
             plan: trip.plan,
@@ -170,6 +217,7 @@ export const useStore = create<State>()(
             get().choosePackage(name, true)
             return
           }
+          const startedAt = epoch
           set((s) => ({
             // A message that failed earlier is replaced by this attempt rather than shown twice.
             messages: [...s.messages.filter((m) => !m.failed), { role: 'user', content: label, at: now() }],
@@ -178,6 +226,7 @@ export const useStore = create<State>()(
           }))
           try {
             const response = await sendChat(get().session, message, get().accessCode, lang)
+            if (epoch !== startedAt) return
             set((s) => ({
               messages: [...s.messages, { role: 'assistant', content: response.reply, at: now() }],
               session: response.session,
@@ -189,6 +238,7 @@ export const useStore = create<State>()(
             }
             await plan(response.session)
           } catch (error) {
+            if (epoch !== startedAt) return
             // If the chat failed before an answer, keep the message on screen marked as not sent,
             // so the traveler stays in the conversation and can send it again with one tap.
             if (get().status === 'thinking') {
@@ -206,15 +256,16 @@ export const useStore = create<State>()(
           const { session } = get()
           if (!session || session.stage !== 'ready' || get().status !== 'idle') return
           set({ error: null })
+          const startedAt = epoch
           try {
             await plan(session)
           } catch (error) {
-            handleError(error)
+            if (epoch === startedAt) handleError(error)
           }
         },
 
         reset: () =>
-          set({ messages: [WELCOME], session: null, summary: null, plan: null, selection: null, tripId: null, events: [], status: 'idle', error: null, notice: null }),
+          set({ messages: [WELCOME], session: null, summary: null, plan: null, selection: null, tripId: null, draftKey: null, events: [], status: 'idle', error: null, notice: null }),
         setAccessCode: (code) => set({ accessCode: code.trim() || null, needsAccessCode: false, error: null }),
         setNeedsAccessCode: (value) => set({ needsAccessCode: value }),
         dismissError: () => set({ error: null }),
@@ -263,10 +314,17 @@ export const useStore = create<State>()(
     },
     {
       name: 'worldtour-session',
-      version: 2,
-      migrate: (state) => state as State,
+      version: 3,
+      migrate: (persisted, version) => {
+        const state = persisted as Partial<State>
+        // Before version 3 the store did not record whose conversation it held. One already saved to an account
+        // (it has a tripId) may belong to someone who has since signed out, so it is dropped; only the language
+        // is kept. One that was never saved is a guest draft.
+        if (version < 3 && state.tripId) return (state.language ? { language: state.language } : {}) as State
+        return { ...state, ownerId: null } as State
+      },
       // Keep the conversation and plan across reloads, but never resume mid-request.
-      partialize: (s) => ({ messages: s.messages, session: s.session, summary: s.summary, plan: s.plan, selection: s.selection, accessCode: s.accessCode, language: s.language, tripId: s.tripId }),
+      partialize: (s) => ({ messages: s.messages, session: s.session, summary: s.summary, plan: s.plan, selection: s.selection, accessCode: s.accessCode, language: s.language, tripId: s.tripId, draftKey: s.draftKey, ownerId: s.ownerId }),
     },
   ),
 )

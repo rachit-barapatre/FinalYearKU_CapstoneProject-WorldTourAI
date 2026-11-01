@@ -4,14 +4,17 @@ import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'rea
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { AccessCode } from './components/AccessCode'
 import { ChatPanel } from './components/ChatPanel'
+import { GuestTripPrompt } from './components/GuestTripPrompt'
 import { Header } from './components/Header'
 import { Landing } from './components/Landing'
 import { PlanningProgress } from './components/PlanningProgress'
+import { SaveStatus } from './components/SaveStatus'
 import { TripBrief } from './components/TripBrief'
 import { ACCOUNTS_ENABLED, SERVER_URL, useAccount, useSession } from './lib/account'
 import { health } from './lib/api'
 import { Toaster } from './lib/toast'
 import { prefetch, tripsPath } from './lib/cache'
+import { useOwnershipGuard } from './lib/ownership'
 import { useTripSync } from './lib/tripSync'
 import { useActivePlan, useStarted, useStore } from './store'
 
@@ -47,6 +50,7 @@ function whenIdle(fn: () => void) {
 
 export default function App() {
   const { needsAccessCode, accessCode, setNeedsAccessCode } = useStore()
+  useOwnershipGuard()
   useTripSync()
   usePreferences()
 
@@ -67,6 +71,7 @@ export default function App() {
   return (
     <div className="flex min-h-dvh flex-col">
       <Header />
+      <GuestTripPrompt />
       <Suspense fallback={<PageLoading />}>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -190,9 +195,12 @@ function Workspace() {
           {planning ? (
             <PlanningProgress />
           ) : active ? (
-            <Suspense fallback={<div className="py-24 text-center text-sm text-slate-500">Loading your plan…</div>}>
-              <PlanView plan={active} />
-            </Suspense>
+            <>
+              <div className="mx-auto max-w-6xl 2xl:max-w-7xl"><SaveStatus /></div>
+              <Suspense fallback={<div className="py-24 text-center text-sm text-slate-500">Loading your plan…</div>}>
+                <PlanView plan={active} />
+              </Suspense>
+            </>
           ) : (
             <TripBrief />
           )}

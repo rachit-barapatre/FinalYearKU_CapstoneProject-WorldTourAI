@@ -193,6 +193,20 @@ export interface Pricing {
   station_km: number
 }
 
+/** What each part of a plan is based on (the planner's own labels), so an estimate never looks like a confirmed price. */
+export interface PlanVerification {
+  levels?: Record<string, string>
+  attractions?: { count?: number; level?: string; source?: string | null }
+  hotels?: { level?: string; count?: number; unconfirmed?: number }
+  flights?: { level?: string; count?: number }
+  ground_transport?: { level?: string }
+  local_transport?: { road_routing?: number; estimate?: number }
+  entry_fees?: { level?: string }
+  opening_hours?: { level?: string }
+  day_text?: { ai_generated_days?: number; built_in_days?: number }
+  schedule_checks?: string[]
+}
+
 export interface Plan {
   trip_summary: string
   origin: string | null
@@ -237,5 +251,7 @@ export interface Plan {
   algorithms_actually_used: string[]
   attractions?: { name: string; category?: string; city?: string | null }[]
   pricing?: Pricing
+  verification?: PlanVerification
+  provider_information?: Record<string, unknown>
   routes: { dijkstra: { path: string[]; total_cost_km: number } | null }
 }

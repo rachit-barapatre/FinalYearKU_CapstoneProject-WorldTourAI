@@ -6,7 +6,7 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-    // During local development the Python API runs on :8000 (python scripts/serve.py in ../ai).
+    // During local development the Python API runs on :8000 (python scripts/serve.py in ../ai_backend).
     proxy: { '/api': 'http://127.0.0.1:8000' },
   },
 })

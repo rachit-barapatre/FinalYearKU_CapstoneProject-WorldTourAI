@@ -43,7 +43,8 @@ export function shareRoute() {
     res.json({
       trip: {
         title: trip.title,
-        sharedBy: (trip.user?.fullName || 'A WorldTour traveler').split(/\s+/)[0],
+        // The first name only; a traveler with no name shows as "A WorldTour traveler" (not just "A").
+        sharedBy: trip.user?.fullName?.trim().split(/\s+/)[0] || 'A WorldTour traveler',
         sharedByPhoto: trip.user?.photo?.url || '',
         plan: latest.plan,
         selection: trip.selection,

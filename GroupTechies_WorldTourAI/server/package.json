@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "node --watch --env-file-if-exists=.env src/server.js",
     "start": "node --env-file-if-exists=.env src/server.js",
-    "test": "node --test --test-concurrency=1 test/*.test.js"
+    "test": "node --test --test-concurrency=1 test/*.test.js",
+    "check:db": "node --env-file-if-exists=.env scripts/check-db.mjs"
   },
   "dependencies": {
     "@clerk/express": "^1.7.84",

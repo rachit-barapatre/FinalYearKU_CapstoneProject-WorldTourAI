@@ -10,6 +10,9 @@ const list = (value) =>
 export const config = {
   port: Number(process.env.PORT) || 5000,
   mongoUri: process.env.MONGODB_URI || '',
+  // Optional. DNS servers Node uses to find the cluster behind a mongodb+srv:// address, e.g. 8.8.8.8,1.1.1.1.
+  // Leave empty to use the ones from your network settings. Not a secret.
+  dnsServers: list(process.env.DNS_SERVERS),
   clerk: {
     publishableKey: process.env.CLERK_PUBLISHABLE_KEY || '',
     secretKey: process.env.CLERK_SECRET_KEY || '',

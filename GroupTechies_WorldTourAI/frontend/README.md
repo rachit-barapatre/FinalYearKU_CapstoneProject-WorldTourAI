@@ -1,11 +1,11 @@
 # WorldTour frontend
 
-React + TypeScript + Vite + Tailwind CSS. Talks to the Python API in `../ai`.
+React + TypeScript + Vite + Tailwind CSS. Talks to the Python API in `../ai_backend`.
 
 ## Run locally
 
 ```bash
-# terminal 1 — the API (from ../ai)
+# terminal 1 — the API (from ../ai_backend)
 venv\Scripts\python scripts\serve.py          # http://127.0.0.1:8000
 
 # terminal 2 — this app

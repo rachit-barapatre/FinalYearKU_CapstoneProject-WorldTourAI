@@ -36,11 +36,14 @@ export function createApp({ identity = clerkIdentity(), photos = cloudinaryPhoto
   // The webhook needs the raw body to check Clerk's signature, so it comes before the JSON parser.
   app.use('/api/webhooks/clerk', express.raw({ type: 'application/json', limit: '1mb' }), clerkWebhookRoute({ photos }))
 
+  app.get('/', (_req, res) => res.json({ name: 'WorldTour accounts API', health: '/api/health' }))
+  // Health needs no sign-in, so it sits before Clerk's middleware: opening it in a browser would otherwise be
+  // sent through Clerk's development handshake (a redirect to clerk.accounts.dev) instead of answering.
+  app.use('/api/health', healthRoute())
+
   app.use(express.json({ limit: '4mb' }))
   app.use(identity.middleware)
 
-  app.get('/', (_req, res) => res.json({ name: 'WorldTour accounts API', health: '/api/health' }))
-  app.use('/api/health', healthRoute())
   app.use('/api/share', shareRoute())
   app.use('/api/me', meRoutes({ identity, photos }))
   app.use('/api/trips', tripRoutes({ identity }))

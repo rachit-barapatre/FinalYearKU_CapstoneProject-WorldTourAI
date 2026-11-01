@@ -41,6 +41,17 @@ export function clerkIdentity() {
       authorizedParties: config.allowedOrigins,
     }),
     userId: (req) => getAuth(req)?.userId ?? null,
+    // Why a token that was sent got no user (expired, clock skew, wrong key, wrong origin...). Only the reason is
+    // returned: never the token. Used for the server log, so the cause is visible instead of guessed.
+    diagnose: async (token) => {
+      try {
+        const { verifyToken } = await import('@clerk/backend')
+        await verifyToken(token, { secretKey: config.clerk.secretKey, authorizedParties: config.allowedOrigins })
+        return 'the token verifies on a second check'
+      } catch (error) {
+        return `${error?.reason ?? 'unknown-reason'}${error?.message ? `: ${String(error.message).slice(0, 200)}` : ''}`
+      }
+    },
     getUser: (id) => client.users.getUser(id),
     updateUser: (id, data) => client.users.updateUser(id, data),
     deleteUser: (id) => client.users.deleteUser(id),

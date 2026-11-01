@@ -40,6 +40,11 @@ export interface TripSummary {
   durationDays: number | null
   startDate: string
   travelers: number | null
+  endDate: string
+  /** What the traveler asked to spend; null when they gave no budget. */
+  budget: number | null
+  budgetCurrency: string
+  preferences: string[]
   estimatedCost: number | null
   currency: string
   status: 'planning' | 'planned' | 'archived'
@@ -66,30 +71,81 @@ interface Session {
   enabled: boolean
   loaded: boolean
   signedIn: boolean
+  /** The signed-in Clerk user's id; null when signed out. */
+  userId: string | null
   clerkImage: string
   getToken: () => Promise<string | null>
 }
 
-const SIGNED_OUT: Session = { enabled: false, loaded: true, signedIn: false, clerkImage: '', getToken: async () => null }
+const SIGNED_OUT: Session = { enabled: false, loaded: true, signedIn: false, userId: null, clerkImage: '', getToken: async () => null }
 const SessionContext = createContext<Session>(SIGNED_OUT)
 
 /** The signed-in state; safe to call whether or not accounts are configured. */
 export const useSession = () => useContext(SessionContext)
 
-let tokenSource: () => Promise<string | null> = async () => null
+// What the server helper knows about Clerk. It is set while ClerkBridge renders (not in an effect), because a page's
+// effects run before its parent's: a page opened in the same moment Clerk finished loading would otherwise ask for a
+// token through a stale function and get "Please sign in" although the person is signed in.
+let tokenSource: (options?: { skipCache?: boolean }) => Promise<string | null> = async () => null
+const clerkState = { bridged: false, loaded: false, signedIn: false }
+const loadedWaiters = new Set<() => void>()
+
+/** Tells the server helper what Clerk currently says. Called by ClerkBridge on every render (and by tests). */
+export function connectClerk(state: { loaded: boolean; signedIn: boolean; getToken: (options?: { skipCache?: boolean }) => Promise<string | null> }) {
+  clerkState.bridged = true
+  clerkState.signedIn = state.signedIn
+  tokenSource = state.getToken
+  if (state.loaded && !clerkState.loaded) {
+    clerkState.loaded = true
+    loadedWaiters.forEach((fn) => fn())
+    loadedWaiters.clear()
+  } else clerkState.loaded = state.loaded
+}
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const NOT_SIGNED_IN = 'Please sign in to continue.'
+const TOKEN_UNAVAILABLE = "We couldn't confirm your sign-in just now. Please try again."
+
+async function untilClerkLoaded(maxMs = 8000) {
+  if (!clerkState.bridged || clerkState.loaded) return
+  await new Promise<void>((resolve) => {
+    const done = () => {
+      clearTimeout(timer)
+      loadedWaiters.delete(done)
+      resolve()
+    }
+    const timer = setTimeout(done, maxMs)
+    loadedWaiters.add(done)
+  })
+}
+
+/**
+ * The signed-in user's token. "Not signed in" is only reported when Clerk itself says nobody is signed in; a token
+ * that is merely slow or briefly unavailable is retried, and then reported as a temporary problem (status 0), never
+ * as a sign-in problem.
+ */
+async function accessToken(fresh = false): Promise<string> {
+  await untilClerkLoaded()
+  if (clerkState.bridged && clerkState.loaded && !clerkState.signedIn) throw new ServerError(NOT_SIGNED_IN, 401)
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const token = await tokenSource({ skipCache: fresh }).catch(() => null)
+    if (token) return token
+    if (!clerkState.bridged) throw new ServerError(NOT_SIGNED_IN, 401)
+    await wait(250 * (attempt + 1))
+  }
+  throw new ServerError(clerkState.loaded && !clerkState.signedIn ? NOT_SIGNED_IN : TOKEN_UNAVAILABLE, clerkState.loaded && !clerkState.signedIn ? 401 : 0)
+}
 
 /** Rendered inside <ClerkProvider>: exposes Clerk's state to the rest of the app and loads the profile. */
 export function ClerkBridge({ children }: { children: ReactNode }) {
-  const { isLoaded, isSignedIn, getToken } = useAuth()
+  const { isLoaded, isSignedIn, getToken, userId } = useAuth()
   const { user } = useUser()
+  connectClerk({ loaded: isLoaded, signedIn: !!isSignedIn, getToken: (options) => getToken(options) })
   const value = useMemo<Session>(
     // Clerk's generic placeholder is not a photo: only a real one (e.g. from Google) is used.
-    () => ({ enabled: true, loaded: isLoaded, signedIn: !!isSignedIn, clerkImage: user?.hasImage ? user.imageUrl : '', getToken: () => getToken() }),
-    [isLoaded, isSignedIn, getToken, user?.hasImage, user?.imageUrl],
+    () => ({ enabled: true, loaded: isLoaded, signedIn: !!isSignedIn, userId: isSignedIn ? (userId ?? null) : null, clerkImage: user?.hasImage ? user.imageUrl : '', getToken: () => getToken() }),
+    [isLoaded, isSignedIn, userId, getToken, user?.hasImage, user?.imageUrl],
   )
-  useEffect(() => {
-    tokenSource = () => getToken()
-  }, [getToken])
   const refresh = useAccount((s) => s.refresh)
   const clear = useAccount((s) => s.clear)
   useEffect(() => {
@@ -105,27 +161,36 @@ export function ClerkBridge({ children }: { children: ReactNode }) {
 /** Calls the WorldTour server with the signed-in user's Clerk token. */
 export async function server<T>(path: string, init: { method?: string; body?: unknown; auth?: boolean; signal?: AbortSignal } = {}): Promise<T> {
   if (!SERVER_URL) throw new ServerError('Accounts are not set up on this site yet.', 503)
-  const headers: Record<string, string> = {}
-  if (init.body !== undefined) headers['Content-Type'] = 'application/json'
-  if (init.auth !== false) {
-    const token = await tokenSource().catch(() => null)
-    if (!token) throw new ServerError('Please sign in to continue.', 401)
-    headers.Authorization = `Bearer ${token}`
+  const method = init.method ?? 'GET'
+  const reading = method === 'GET'
+  let fresh = false // after a 401 the token is asked for again, bypassing Clerk's cache, once
+  for (let attempt = 0; ; attempt++) {
+    const headers: Record<string, string> = {}
+    if (init.body !== undefined) headers['Content-Type'] = 'application/json'
+    if (init.auth !== false) headers.Authorization = `Bearer ${await accessToken(fresh)}`
+    let response: Response
+    try {
+      response = await fetch(`${SERVER_URL}${path}`, { method, headers, body: init.body === undefined ? undefined : JSON.stringify(init.body), signal: init.signal })
+    } catch {
+      // A dropped connection or a cold server is not a sign-in problem. Reading is simply tried again.
+      if (reading && attempt < 2 && !init.signal?.aborted) {
+        await wait(600 * (attempt + 1))
+        continue
+      }
+      throw new ServerError("Couldn't reach WorldTour. Check your connection and try again.", 0)
+    }
+    if (response.status === 401 && init.auth !== false && !fresh) {
+      fresh = true // the token may simply have expired between being fetched and being checked
+      continue
+    }
+    if (reading && [502, 503, 504].includes(response.status) && attempt < 2) {
+      await wait(600 * (attempt + 1))
+      continue
+    }
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) throw new ServerError(data?.error || `Request failed (${response.status}).`, response.status)
+    return data as T
   }
-  let response: Response
-  try {
-    response = await fetch(`${SERVER_URL}${path}`, {
-      method: init.method ?? 'GET',
-      headers,
-      body: init.body === undefined ? undefined : JSON.stringify(init.body),
-      signal: init.signal,
-    })
-  } catch {
-    throw new ServerError("Couldn't reach WorldTour. Check your connection and try again.", 0)
-  }
-  const data = await response.json().catch(() => ({}))
-  if (!response.ok) throw new ServerError(data?.error || `Request failed (${response.status}).`, response.status)
-  return data as T
 }
 
 // --------------------------------------------------------------------------- the profile

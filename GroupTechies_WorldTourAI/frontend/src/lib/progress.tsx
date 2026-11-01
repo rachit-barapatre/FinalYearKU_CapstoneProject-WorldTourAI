@@ -32,10 +32,18 @@ export function stepStates(events: AgentEvent[]): Record<string, StepState> {
   return result
 }
 
+/** What a still-working step is doing right now, taken from its latest AGENT_PROGRESS event. */
+export function stepNotes(events: AgentEvent[]): Record<string, string> {
+  const notes: Record<string, string> = {}
+  for (const e of events) if (e.event === 'AGENT_PROGRESS') notes[e.agent_id] = e.message
+  return notes
+}
+
 export function useProgress() {
   const events = useStore((s) => s.events)
   const states = stepStates(events)
+  const notes = stepNotes(events)
   const visible = STEPS.filter((step) => states[step.id] !== 'skipped')
   const finished = visible.filter((step) => states[step.id] !== 'working').length
-  return { states, visible, finished, total: visible.length }
+  return { states, notes, visible, finished, total: visible.length }
 }

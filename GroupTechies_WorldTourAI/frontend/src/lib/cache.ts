@@ -50,6 +50,12 @@ export function invalidate(prefix: string) {
   for (const key of [...store.keys()]) if (key.startsWith(prefix)) store.delete(key)
 }
 
+/** Forget every cached answer (another account is about to use this browser). */
+export function clearServerCache() {
+  store.clear()
+  inflight.clear()
+}
+
 // Another person signing in on this browser must never see the previous account's data.
 useAccount.subscribe((state, previous) => {
   if (!state.profile && previous.profile) store.clear()

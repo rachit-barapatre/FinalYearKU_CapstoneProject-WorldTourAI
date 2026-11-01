@@ -35,6 +35,9 @@ function level(planned: number) {
 
 export function ProfilePage() {
   const profile = useAccount((s) => s.profile)
+  const profileError = useAccount((s) => s.error)
+  const profileLoading = useAccount((s) => s.loading)
+  const refreshProfile = useAccount((s) => s.refresh)
   const { data, error, reload } = useServerData<{ stats: Stats; recent: TripSummary[] }>('/api/stats')
   const stats = data?.stats
   const cover = useWikiImage([stats?.topDestination, profile?.preferences.homeCity, 'Lake Palace'], 1600)
@@ -62,7 +65,7 @@ export function ProfilePage() {
               </div>
               <div className="min-w-0 flex-1 sm:pb-1">
                 <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                  <h2 className="truncate text-2xl font-extrabold text-slate-900 dark:text-white">{profile?.fullName || 'Traveler'}</h2>
+                  <h2 className="truncate text-2xl font-extrabold text-slate-900 dark:text-white">{profile?.fullName || (profileLoading ? <span className="skeleton inline-block h-7 w-40 rounded align-middle" /> : 'Traveler')}</h2>
                   <span className="inline-flex items-center gap-1 rounded-full bg-coral-50 px-2.5 py-0.5 text-xs font-bold text-coral-600 ring-1 ring-coral-100 dark:bg-coral-500/15 dark:text-coral-400 dark:ring-coral-400/30">
                     {rank.icon} {rank.name}
                   </span>
@@ -82,6 +85,10 @@ export function ProfilePage() {
             </div>
           </div>
         </section>
+
+        {profileError && (
+          <ErrorNote onRetry={() => void refreshProfile()}>{profile ? `Couldn't refresh your profile: ${profileError}` : `Couldn't load your profile: ${profileError}`}</ErrorNote>
+        )}
 
         {error && !data ? (
           <ErrorNote onRetry={reload}>{error}</ErrorNote>

@@ -25,6 +25,9 @@ const versionSchema = new mongoose.Schema(
 const tripSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    // Chosen by the browser once per conversation. A repeated "create" (a retry after a lost answer, a refresh in
+    // the middle of saving) finds the trip it already made instead of making a second one.
+    clientId: { type: String, maxlength: 64, default: undefined },
     title: { type: String, trim: true, maxlength: 120, default: 'New trip' },
     customTitle: { type: Boolean, default: false },
     firstPrompt: { type: String, default: '', maxlength: 2000 },
@@ -34,6 +37,11 @@ const tripSchema = new mongoose.Schema(
     cities: { type: [String], default: [] },
     durationDays: { type: Number, default: null },
     startDate: { type: String, default: '' },
+    endDate: { type: String, default: '' },
+    // What the traveler asked to spend (not the estimate); null when they gave no budget.
+    budget: { type: Number, default: null },
+    budgetCurrency: { type: String, default: '' },
+    preferences: { type: [String], default: [] },
     travelers: { type: Number, default: null },
     estimatedCost: { type: Number, default: null },
     currency: { type: String, default: '' },
@@ -55,6 +63,7 @@ const tripSchema = new mongoose.Schema(
 )
 
 tripSchema.index({ user: 1, updatedAt: -1 })
+tripSchema.index({ user: 1, clientId: 1 }, { unique: true, partialFilterExpression: { clientId: { $type: 'string' } } })
 tripSchema.index({ 'share.id': 1 }, { unique: true, sparse: true })
 
 tripSchema.methods.toSummary = function toSummary() {
@@ -68,6 +77,10 @@ tripSchema.methods.toSummary = function toSummary() {
     cities: this.cities,
     durationDays: this.durationDays,
     startDate: this.startDate,
+    endDate: this.endDate,
+    budget: this.budget,
+    budgetCurrency: this.budgetCurrency,
+    preferences: this.preferences,
     travelers: this.travelers,
     estimatedCost: this.estimatedCost,
     currency: this.currency,

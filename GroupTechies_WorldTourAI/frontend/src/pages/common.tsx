@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { CalendarDays, Layers, MapPin, Share2, Star, Users } from 'lucide-react'
+import { CalendarDays, Clock, Layers, MapPin, Share2, Star, Users, Wallet } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import type { TripSummary } from '../lib/account'
@@ -82,10 +82,12 @@ export function TripCard({ trip, actions }: { trip: TripSummary; actions?: React
         </div>
         <div className="mt-0.5 truncate text-sm text-slate-600 dark:text-slate-300">{tripRoute(trip)}</div>
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-          {trip.startDate && <span className="inline-flex items-center gap-1"><CalendarDays size={12} /> {prettyDate(trip.startDate, true)}</span>}
-          {trip.travelers && <span className="inline-flex items-center gap-1"><Users size={12} /> {trip.travelers}</span>}
-          {trip.versions > 0 && <span className="inline-flex items-center gap-1"><Layers size={12} /> {trip.versions} plan{trip.versions > 1 ? 's' : ''}</span>}
-          <span>Updated {ago(trip.updatedAt)}</span>
+          <span className="inline-flex items-center gap-1"><CalendarDays size={12} /> {trip.startDate ? (trip.endDate && trip.endDate !== trip.startDate ? `${prettyDate(trip.startDate)} – ${prettyDate(trip.endDate, true)}` : prettyDate(trip.startDate, true)) : 'Flexible dates'}</span>
+          {trip.durationDays && <span className="inline-flex items-center gap-1"><Clock size={12} /> {trip.durationDays} day{trip.durationDays > 1 ? 's' : ''}</span>}
+          {trip.travelers && <span className="inline-flex items-center gap-1"><Users size={12} /> {trip.travelers} traveler{trip.travelers > 1 ? 's' : ''}</span>}
+          {trip.budget != null && <span className="inline-flex items-center gap-1"><Wallet size={12} /> Budget {money(trip.budget, trip.budgetCurrency)}</span>}
+          {trip.versions > 1 && <span className="inline-flex items-center gap-1"><Layers size={12} /> {trip.versions} versions</span>}
+          <span>Saved {prettyDate(trip.createdAt.slice(0, 10), true)}</span>
         </div>
         </div>
       </Link>

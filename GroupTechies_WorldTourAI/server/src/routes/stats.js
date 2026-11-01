@@ -37,7 +37,7 @@ export function statsRoutes({ identity }) {
         { $group: { _id: '$currency', amount: { $sum: '$estimatedCost' } } },
         { $sort: { amount: -1 } },
       ]),
-      Trip.find({ user: userId, status: { $ne: 'archived' } }).sort({ updatedAt: -1 }).limit(4).select('-session -selection -versions.plan -messages.content -notes'),
+      Trip.find({ user: userId, status: 'planned' }).sort({ updatedAt: -1 }).limit(4).select('-session -selection -versions.plan -messages.content -notes'),
       // Trips started per month, last 6 months (the activity chart on the profile).
       Trip.aggregate([
         { $match: { user: userId, createdAt: { $gte: since } } },

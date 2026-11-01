@@ -6,7 +6,7 @@ import { Card } from './ui'
 
 export function PlanningProgress() {
   const notice = useStore((s) => s.notice)
-  const { states, visible, finished, total } = useProgress()
+  const { states, notes, visible, finished, total } = useProgress()
 
   return (
     <div className="mx-auto max-w-2xl animate-fade-up py-4 lg:py-10">
@@ -49,7 +49,7 @@ export function PlanningProgress() {
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold text-slate-900 dark:text-white">{step.label}</div>
                 <div className="truncate text-xs text-slate-500 dark:text-slate-400">
-                  {state === 'done' ? step.done : state === 'failed' ? "Couldn't load right now — the plan continues without it" : 'Working on it…'}
+                  {state === 'done' ? step.done : state === 'failed' ? "Couldn't load right now — the plan continues without it" : (notes[step.id] ?? 'Working on it…')}
                 </div>
               </div>
               {state === 'done' && <CheckCircle2 className="shrink-0 text-emerald-500" size={20} />}

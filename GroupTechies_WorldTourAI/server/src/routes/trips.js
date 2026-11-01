@@ -14,9 +14,12 @@ const message = z.object({
 
 /** What the planner sends: the whole conversation so far, the chat session, the latest plan and the picks. */
 const snapshot = z.object({
-  messages: z.array(message).max(config.maxMessages).optional(),
+  // Longer conversations are not refused: only the most recent maxMessages are kept (see applySnapshot).
+  messages: z.array(message).max(config.maxMessages * 10).optional(),
+  clientId: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/, 'is not a valid id').optional(),
   session: z.record(z.string(), z.unknown()).nullable().optional(),
-  plan: z.record(z.string(), z.unknown()).nullable().optional(),
+  // Only a finished itinerary is a trip. Every field the planner produced is kept as it came (unknown ones too).
+  plan: z.record(z.string(), z.unknown()).refine(isFinishedPlan, 'is not a finished itinerary').nullable().optional(),
   selection: z.record(z.string(), z.unknown()).nullable().optional(),
 })
 
@@ -35,6 +38,11 @@ const listQuery = z.object({
   page: z.coerce.number().int().min(1).max(1000).optional(),
   limit: z.coerce.number().int().min(1).max(50).optional(),
 })
+
+/** A plan with at least one day in its timetable. Anything less is a failed or partial generation. */
+export function isFinishedPlan(plan) {
+  return !!plan && Array.isArray(plan.daily_itinerary) && plan.daily_itinerary.length > 0
+}
 
 const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const hashPlan = (plan) => createHash('sha1').update(JSON.stringify(plan)).digest('hex')
@@ -88,6 +96,13 @@ function summarise(trip, plan) {
   trip.cities = Array.isArray(plan.cities) ? plan.cities.filter((c) => typeof c === 'string').slice(0, 10) : trip.cities
   trip.durationDays = Number(plan.duration?.days) || trip.durationDays || null
   trip.startDate = String(plan.dates?.start_date || trip.startDate || '')
+  trip.endDate = String(plan.dates?.end_date || trip.endDate || '')
+  if (plan.budget && typeof plan.budget === 'object') {
+    const amount = Number(plan.budget.amount)
+    trip.budget = plan.budget.user_stated !== false && Number.isFinite(amount) && amount > 0 ? amount : null
+    trip.budgetCurrency = trip.budget != null ? String(plan.budget.currency || '') : ''
+  }
+  if (Array.isArray(plan.preferences)) trip.preferences = plan.preferences.filter((p) => typeof p === 'string').slice(0, 20)
   trip.travelers = Number(plan.travelers) || trip.travelers || null
   const latest = trip.versions.at(-1)
   if (latest) {
@@ -135,7 +150,8 @@ export function tripRoutes({ identity }) {
     const q = parse(listQuery, req.query)
     const filter = { user: req.user._id }
     if (q.favorite === 'true') filter.favorite = true
-    if (q.status === 'active') filter.status = { $ne: 'archived' }
+    // The library lists itineraries: "active" is every planned trip that is not archived.
+    if (q.status === 'active') filter.status = 'planned'
     else if (q.status) filter.status = q.status
     if (q.search) {
       const rx = new RegExp(escapeRegex(q.search), 'i')
@@ -152,11 +168,27 @@ export function tripRoutes({ identity }) {
   })
 
   router.post('/', async (req, res) => {
+    // The owner is always the signed-in user from the verified Clerk session. Nothing in the body can change that.
     const data = parse(snapshot, req.body)
-    const trip = new Trip({ user: req.user._id })
+    if (!isFinishedPlan(data.plan)) throw new HttpError(400, 'Only a finished itinerary can be saved to My trips.')
+    const { clientId } = data
+    const find = () => (clientId ? Trip.findOne({ user: req.user._id, clientId }) : null)
+    let trip = await find()
+    let created = !trip
+    if (!trip) trip = new Trip({ user: req.user._id, ...(clientId ? { clientId } : {}) })
     applySnapshot(trip, data)
-    await trip.save()
-    res.status(201).json({ trip: detail(trip) })
+    try {
+      await trip.save()
+    } catch (error) {
+      // Two saves of the same conversation raced: the other one won, so update its trip instead of failing.
+      if (!(clientId && error?.code === 11000)) throw error
+      trip = await find()
+      if (!trip) throw error
+      created = false
+      applySnapshot(trip, data)
+      await trip.save()
+    }
+    res.status(created ? 201 : 200).json({ trip: detail(trip) })
   })
 
   router.get('/:id', async (req, res) => res.json({ trip: detail(await own(req)) }))

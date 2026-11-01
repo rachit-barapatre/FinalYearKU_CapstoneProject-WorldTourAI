@@ -1,7 +1,7 @@
-import { AuthenticateWithRedirectCallback, useSignIn, useSignUp } from '@clerk/clerk-react'
+import { useClerk, useSignIn, useSignUp } from '@clerk/clerk-react'
 import clsx from 'clsx'
 import { ArrowLeft, Check, Eye, EyeOff, Loader2, Lock, Mail, Phone, ShieldCheck, User } from 'lucide-react'
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { ACCOUNTS_ENABLED, useSession } from '../lib/account'
 import { useWikiImage } from '../lib/images'
@@ -17,6 +17,27 @@ function clerkMessage(error: unknown): string {
   if (first?.code === 'form_password_incorrect') return 'That password is not right. Try again or reset it.'
   if (first?.code === 'form_identifier_not_found') return 'No account uses this email. Check it, or create an account.'
   return first?.longMessage || first?.message || (error instanceof Error ? error.message : 'Something went wrong. Please try again.')
+}
+
+const GOOGLE_STOPPED = 'Google sign-in did not finish. Please try again, or use your email and password.'
+
+/**
+ * Clerk sends the traveler back here (see SsoCallback) when a Google sign-up could not be completed. Say why, using what
+ * Clerk recorded, instead of leaving them on a page of Clerk's own.
+ */
+function googleSignUpProblem(signUp: { status?: string | null; missingFields?: string[]; verifications?: { externalAccount?: { error?: { longMessage?: string; message?: string } | null } } }): string {
+  const failure = signUp.verifications?.externalAccount?.error
+  if (failure) return failure.longMessage || failure.message || GOOGLE_STOPPED
+  const missing = signUp.missingFields ?? []
+  if (signUp.status === 'missing_requirements' && missing.length) {
+    return `Google confirmed your email, but sign-up still needs: ${missing.map((field) => field.replace(/_/g, ' ')).join(', ')}. That is a setting in this site's Clerk dashboard (User & authentication), not something you did wrong.`
+  }
+  return GOOGLE_STOPPED
+}
+
+function googleSignInProblem(signIn: { firstFactorVerification?: { error?: { longMessage?: string; message?: string } | null } }): string {
+  const failure = signIn.firstFactorVerification?.error
+  return failure?.longMessage || failure?.message || GOOGLE_STOPPED
 }
 
 /** 0–4: length, mixed case, a number, a symbol. */
@@ -96,7 +117,7 @@ function Shell({ photos, children }: { photos: (string | null)[]; children: Reac
           </div>
           <h2 className="max-w-md animate-fade-up text-3xl font-extrabold leading-tight xl:text-4xl">Every trip you plan, saved and ready to book.</h2>
           <ul className="stagger mt-6 space-y-2.5 text-sm text-white/85">
-            {['Your prompts and every itinerary, in one history', 'Pick up any trip where you left off', 'Share a read-only plan with family and friends', 'Your home city, currency and language remembered'].map((item) => (
+            {['Every itinerary you generate, saved automatically', 'Pick up any trip where you left off', 'Share a read-only plan with family and friends', 'Your home city, currency and language remembered'].map((item) => (
               <li key={item} className="flex items-center gap-2.5">
                 <span className="grid h-5 w-5 place-items-center rounded-full bg-coral-500"><Check size={12} strokeWidth={3} /></span>
                 {item}
@@ -214,6 +235,14 @@ function SignUpForm({ redirect }: { redirect: string }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const set = (key: keyof typeof form) => (value: string) => setForm((f) => ({ ...f, [key]: value }))
+  const [params] = useSearchParams()
+  const sentBack = !!params.get('oauth')
+  const explained = useRef(false)
+  useEffect(() => {
+    if (!sentBack || !isLoaded || explained.current) return
+    explained.current = true
+    setError(googleSignUpProblem(signUp))
+  }, [sentBack, isLoaded, signUp])
 
   const problems = {
     fullName: form.fullName.trim().split(/\s+/).filter(Boolean).length < 1 || form.fullName.trim().length < 2 ? 'Enter your full name.' : null,
@@ -380,6 +409,14 @@ function SignInForm({ redirect }: { redirect: string }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
+  const [params] = useSearchParams()
+  const sentBack = !!params.get('oauth')
+  const explained = useRef(false)
+  useEffect(() => {
+    if (!sentBack || !isLoaded || explained.current) return
+    explained.current = true
+    setError(googleSignInProblem(signIn))
+  }, [sentBack, isLoaded, signIn])
 
   const finish = async (result: { status: string | null; createdSessionId: string | null }) => {
     if (result.status === 'complete') {
@@ -507,12 +544,50 @@ function SignInForm({ redirect }: { redirect: string }) {
   )
 }
 
-/** Google sends the traveler back here; Clerk finishes the sign-in and moves on. */
+/** The callback URL already being finished. React runs effects twice in development, so this keeps Clerk from finishing one Google sign-in twice. */
+let finishing: string | null = null
+
+/**
+ * Google sends the traveler back here; Clerk finishes the sign-in and moves on. Where Clerk has to send them when the
+ * sign-in or sign-up cannot finish is set explicitly: without these, Clerk uses the hosted pages on its own domain
+ * (accounts.dev), which is how a Google sign-up that still needs details ended up there.
+ *
+ * Clerk's own <AuthenticateWithRedirectCallback> ignores the outcome (`void handleRedirectCallback()`): if Clerk throws,
+ * or finishes without sending the traveler anywhere, the page stays here for good. So the callback is run here, once, and
+ * its outcome is handled: an error or a missing session sends the traveler back to sign-in with a message; a session
+ * Clerk did not navigate away from is taken home. Nothing here waits on a timer.
+ */
 export function SsoCallback() {
+  const clerk = useClerk()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const url = window.location.href
+    if (finishing === url) return
+    finishing = url
+    const here = window.location.pathname
+    clerk
+      .handleRedirectCallback({
+        signInUrl: '/sign-in?oauth=stopped',
+        signUpUrl: '/sign-up?oauth=stopped',
+        continueSignUpUrl: '/sign-up?oauth=stopped',
+        signInFallbackRedirectUrl: '/',
+        signUpFallbackRedirectUrl: '/onboarding/photo',
+      })
+      .then(() => {
+        if (window.location.pathname !== here) return // Clerk moved on by itself
+        navigate(clerk.session ? '/' : '/sign-in?oauth=stopped', { replace: true })
+      })
+      .catch((error: unknown) => {
+        const first = (error as { errors?: { code?: string }[] })?.errors?.[0]
+        console.error('[sso-callback] Clerk could not finish the Google sign-in', first?.code ?? (error instanceof Error ? error.name : 'unknown'))
+        navigate('/sign-in?oauth=stopped', { replace: true })
+      })
+  }, [clerk, navigate])
+
   return (
     <div className="grid flex-1 place-items-center py-24">
-      <img src="/logo-globe.svg" alt="" width={56} height={56} />
-      <AuthenticateWithRedirectCallback signInFallbackRedirectUrl="/" signUpFallbackRedirectUrl="/onboarding/photo" />
+      <img src="/logo-globe.svg" alt="Finishing sign-in" width={56} height={56} />
     </div>
   )
 }

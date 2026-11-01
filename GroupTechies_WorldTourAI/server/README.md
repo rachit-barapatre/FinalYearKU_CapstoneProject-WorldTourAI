@@ -2,12 +2,12 @@
 
 Express + MongoDB Atlas API for signed-in travellers: profiles, profile photos, saved trips with every
 prompt and every generated itinerary, history, sharing and settings. Sign-in is handled by **Clerk**,
-photos are stored on **Cloudinary**. The trip planner itself stays in `ai/`; the website (`frontend/`)
+photos are stored on **Cloudinary**. The trip planner itself stays in `ai_backend/`; the website (`frontend/`)
 talks to both.
 
 ```
 Browser ── Clerk (sign-up, sign-in, email codes, Google)
-   ├────── ai/      chat + planning (unchanged)
+   ├────── ai_backend/  chat + planning (unchanged)
    └────── server/  this API: users, trips, versions, history, sharing  ── MongoDB Atlas, Cloudinary
 ```
 
@@ -57,8 +57,11 @@ All routes except health and shared trips need `Authorization: Bearer <Clerk ses
 
 ### 2. Clerk
 1. Create an application; sign-in options: **Email** + **Password**, and **Google**.
-2. Under **User & authentication**, keep *phone number* off as a sign-in method (the phone is saved on the
-   WorldTour profile instead), and leave *username* off.
+2. Under **User & authentication → Email, phone, username**, turn **Phone number OFF** (not just "optional"): the
+   sign-up form collects the phone and saves it on the WorldTour profile instead. If Clerk requires a phone number,
+   Google sign-up cannot finish (Google does not supply one) and Clerk sends the traveler to its own hosted sign-up
+   page, and email sign-up stops at "some details are still missing". Keep **Email address** on and required, and
+   leave *username* off.
 3. **API keys** → copy the **Publishable key** (`pk_...`) and **Secret key** (`sk_...`).
 4. Note: Clerk *production* instances need a domain you own. On `*.vercel.app` use the **Development**
    instance keys (`pk_test_` / `sk_test_`); they work on the live site with a small "Development mode" badge.

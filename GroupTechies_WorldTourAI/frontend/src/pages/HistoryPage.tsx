@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { Archive, ArchiveRestore, Heart, Pencil, Plane, Plus, Repeat, Search, Share2, Sparkles, Star, Trash2, X } from 'lucide-react'
+import { Archive, ArchiveRestore, Heart, Pencil, Plane, Plus, Repeat, Search, Share2, Star, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Select } from '../components/Select'
@@ -7,16 +7,15 @@ import { ShareDialog } from '../components/ShareDialog'
 import { ConfirmDialog, CountUp } from '../components/ui'
 import { server, type TripSummary } from '../lib/account'
 import { invalidate, load as loadCached, peek, setCached, tripsPath, useServerData } from '../lib/cache'
+import { cacheIsAuthoritative, historySubtitle, historyView } from '../lib/historyView'
 import { toast } from '../lib/toast'
 import { useStore } from '../store'
 import { ErrorNote, IconButton, Page, TripCard, tripRoute } from './common'
 
-type Filter = 'active' | 'favorite' | 'planned' | 'planning' | 'archived'
+type Filter = 'active' | 'favorite' | 'archived'
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'active', label: 'All' },
   { id: 'favorite', label: 'Favourites' },
-  { id: 'planned', label: 'Planned' },
-  { id: 'planning', label: 'Not planned yet' },
   { id: 'archived', label: 'Archived' },
 ]
 
@@ -69,13 +68,15 @@ export function HistoryPage() {
       // The first page shows straight from the cache (opened before or prefetched from the menu), then refreshes.
       const cached = nextPage === 1 ? peek<ListResponse>(path) : undefined
       if (cached) apply(cached, false)
-      setLoading(!cached)
+      // A cached empty list proves nothing (a trip may have been saved since), so it still shows as loading.
+      setLoading(!cacheIsAuthoritative(cached))
       setError(null)
       try {
         const data = await loadCached<ListResponse>(path)
         if (nextPage > 1 || shownPath.current === path) apply(data, nextPage > 1)
       } catch (e) {
-        if (!cached) setError(e instanceof Error ? e.message : 'Could not load your trips.')
+        // Never hidden: with nothing to show it is the whole page, otherwise a banner above the trips already known.
+        if (nextPage > 1 || shownPath.current === path) setError(e instanceof Error ? e.message : 'Could not load your trips.')
       } finally {
         setLoading(false)
       }
@@ -120,22 +121,23 @@ export function HistoryPage() {
 
   const counts: { id: Filter; label: string; value?: number; icon: ReactNode }[] = [
     { id: 'active', label: 'Trips', value: stats?.trips, icon: <Plane size={15} /> },
-    { id: 'planned', label: 'Planned', value: stats?.planned, icon: <Sparkles size={15} /> },
     { id: 'favorite', label: 'Favourites', value: stats?.favorites, icon: <Heart size={15} /> },
   ]
+
+  const view = historyView({ loading, error, count: trips.length, filtering: !!query || filter !== 'active' })
 
   return (
     <Page
       wide
       title="My trips"
-      subtitle={total ? `${total} trip${total > 1 ? 's' : ''} · every prompt and itinerary is saved automatically` : 'Every trip you plan while signed in is saved here.'}
+      subtitle={historySubtitle(view, total)}
       action={
         <button onClick={() => { reset(); navigate('/') }} className="btn-shine inline-flex h-10 items-center gap-2 rounded-lg bg-brand-700 px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-px hover:bg-brand-800 dark:bg-brand-500">
           <Plus size={16} /> New trip
         </button>
       }
     >
-      <div className="stagger mb-5 grid grid-cols-3 gap-2 sm:gap-3">
+      <div className="stagger mb-5 grid grid-cols-2 gap-2 sm:gap-3">
         {counts.map((c) => (
           <button
             key={c.id}
@@ -189,9 +191,10 @@ export function HistoryPage() {
         ))}
       </div>
 
-      {error ? (
+      {error && view === 'list' && <div className="mb-3"><ErrorNote onRetry={() => void load(1)}>{`Couldn't refresh your trips: ${error}`}</ErrorNote></div>}
+      {view === 'error' ? (
         <ErrorNote onRetry={() => void load(1)}>{error}</ErrorNote>
-      ) : loading && !trips.length ? (
+      ) : view === 'loading' ? (
         <div className="space-y-3" aria-busy="true">
           {[0, 1, 2].map((i) => (
             <div key={i} className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-white/10 dark:bg-ink-800">
@@ -200,11 +203,11 @@ export function HistoryPage() {
             </div>
           ))}
         </div>
-      ) : !trips.length ? (
+      ) : view !== 'list' ? (
         <div className="animate-fade-up rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center sm:p-12 dark:border-white/15 dark:bg-ink-800">
           <img src="/logo-globe.svg" alt="" width={72} height={72} className="float-slow mx-auto" />
           <h2 className="mt-4 text-lg font-bold text-slate-900 dark:text-white">{query || filter !== 'active' ? 'No trips match' : 'No trips yet'}</h2>
-          <p className="mx-auto mt-1 max-w-md text-sm text-slate-600 dark:text-slate-300">{query || filter !== 'active' ? 'Try another search or filter.' : 'Plan a trip and it appears here with every prompt and itinerary. Try one of these:'}</p>
+          <p className="mx-auto mt-1 max-w-md text-sm text-slate-600 dark:text-slate-300">{query || filter !== 'active' ? 'Try another search or filter.' : 'Plan a trip while signed in and its complete itinerary is saved here automatically. Try one of these:'}</p>
           {!query && filter === 'active' && (
             <div className="mt-5 flex flex-wrap justify-center gap-2">
               {IDEAS.map((idea) => (
@@ -213,6 +216,11 @@ export function HistoryPage() {
                 </button>
               ))}
             </div>
+          )}
+          {!query && filter === 'active' && (
+            <button onClick={() => { reset(); navigate('/') }} className="btn-shine mt-5 inline-flex h-10 items-center gap-2 rounded-lg bg-brand-700 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-800 dark:bg-brand-500">
+              <Plus size={16} /> Plan a trip
+            </button>
           )}
         </div>
       ) : (
@@ -262,7 +270,7 @@ export function HistoryPage() {
         tone="danger"
         icon={<Trash2 size={20} />}
         title="Delete this trip?"
-        body={<>“{removing?.title}”, its conversation and all {removing?.versions ?? 0} itinerary versions will be deleted for good.</>}
+        body={<>The saved itinerary “{removing?.title}”{(removing?.versions ?? 0) > 1 ? ` and its ${removing?.versions} versions` : ''} will be deleted for good.</>}
         confirmLabel="Delete trip"
         onCancel={() => setRemoving(null)}
         onConfirm={() => {
