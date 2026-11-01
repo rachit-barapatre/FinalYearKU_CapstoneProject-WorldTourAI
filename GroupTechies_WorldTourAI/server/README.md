@@ -20,7 +20,8 @@ cd server
 npm install
 # fill in server/.env (see .env.example)
 npm run dev          # http://localhost:5000/api/health
-npm test             # 14 API tests on a temporary in-memory MongoDB
+npm test             # API tests (the main API suite starts a temporary in-memory MongoDB; the rest need nothing)
+npm run check:db     # tells you why MongoDB cannot be reached (DNS, Atlas IP list, credentials)
 ```
 
 For the website to use it locally, set in `frontend/.env`:
@@ -37,11 +38,11 @@ All routes except health and shared trips need `Authorization: Bearer <Clerk ses
 | `POST /api/me/onboarding` · `POST /api/me/refresh` | Photo step done · re-read name/email from Clerk |
 | `POST /api/me/photo/sign` · `PATCH /api/me/photo` · `DELETE /api/me/photo` | Signed Cloudinary upload · save · remove |
 | `DELETE /api/me` | Delete the account, its trips and photo (and the Clerk user) |
-| `GET /api/trips` | History: `search`, `favorite`, `status`, `sort`, `page`, `limit` |
-| `POST /api/trips` · `PUT /api/trips/:id/sync` | Save a trip snapshot (messages, chat session, plan, picks); a new plan becomes a new version |
+| `GET /api/trips` | History: `search`, `favorite`, `status` (`active` = planned), `sort`, `page`, `limit` |
+| `POST /api/trips` · `PUT /api/trips/:id/sync` | Save a trip snapshot (messages, chat session, plan, picks); a new plan becomes a new version. Only a **finished plan** (non-empty `daily_itinerary`) is saved; the website sends a client-chosen `clientId` so a retried save never creates a duplicate |
 | `GET /api/trips/:id` · `GET /api/trips/:id/versions/:versionId` | Trip with conversation and version list · one version's plan |
 | `PATCH /api/trips/:id` · `DELETE /api/trips/:id` | Rename, favourite, notes, archive · delete |
-| `POST /api/trips/:id/share` · `DELETE /api/trips/:id/share` | Turn the read-only share link on · off |
+| `GET /api/trips/:id/share` · `POST /api/trips/:id/share` · `DELETE /api/trips/:id/share` | Share state and link · turn the read-only link on · off |
 | `GET /api/share/:shareId` | Public read-only shared trip (no conversation, no account details) |
 | `GET /api/stats` | Numbers for the profile page |
 | `POST /api/webhooks/clerk` | Clerk `user.created/updated/deleted`, signature-checked |
@@ -75,7 +76,7 @@ Dashboard → **Product environment credentials** → Cloud name, API key, API s
 2. **Environment Variables** — add every name from `.env.example` with your values:
    `MONGODB_URI`, `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`,
    `CLOUDINARY_API_SECRET`, `CLOUDINARY_FOLDER`, `ALLOWED_ORIGINS=https://worldtour-xi.vercel.app`,
-   `APP_URL=https://worldtour-xi.vercel.app`.
+   `APP_URL=https://worldtour-xi.vercel.app` (the last two are optional locally, required on Vercel for your own site address).
 3. Deploy, then open `https://<server>.vercel.app/api/health` → `"database": "connected"`, `"clerk": true`, `"cloudinary": true`.
 
 ### 5. Clerk webhook (keeps the database in step with Clerk)

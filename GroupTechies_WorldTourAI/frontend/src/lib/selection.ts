@@ -4,7 +4,7 @@
 // chose; applySelection() returns a new plan with the transport, hotels, day-1 arrival and last-day
 // departure, local transport and cost breakdown updated. Everything else in the itinerary stays as it was,
 // so switching options never reshuffles the days. The arrival and departure blocks follow the same rules
-// as the planner's itinerary composer (ai/src/worldtour_ai/services/itinerary_composer.py).
+// as the planner's itinerary composer (ai_backend/src/worldtour_ai/services/itinerary_composer.py).
 
 import type { Activity, BreakdownRow, Flight, GroundOption, ItineraryDay, Package, Plan, Pricing, TransportChoice } from './types'
 

@@ -1,4 +1,4 @@
-"""Summarise the agent logs in ai/logs/ (written by worldtour_ai/utils/agent_logs.py).
+"""Summarise the agent logs in ai_backend/logs/ (written by worldtour_ai/utils/agent_logs.py).
 
 Usage (from the ai folder):
     venv/Scripts/python scripts/agent_report.py              # last 7 days
@@ -68,7 +68,7 @@ def main() -> None:
     parser.add_argument("--days", type=int, default=7)
     parser.add_argument("--run", help="show every event of one run_id")
     parser.add_argument("--errors", type=int, default=15, help="how many recent errors to list")
-    parser.add_argument("--file", help="a .jsonl file (e.g. exported from Vercel) instead of ai/logs")
+    parser.add_argument("--file", help="a .jsonl file (e.g. exported from Vercel) instead of ai_backend/logs")
     args = parser.parse_args()
     rows = load(args.days, args.file)
     if not rows:

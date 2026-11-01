@@ -246,7 +246,7 @@ useAccount.subscribe((state, previous) => {
   }
 })
 
-// The chat uses the saved home city and currency as defaults (see ai/ ChatBody).
+// The chat uses the saved home city and currency as defaults (sent with each chat request; see ChatBody in ai_backend/src/worldtour_ai/web/app.py).
 useAccount.subscribe((state) => {
   const prefs = state.profile?.preferences
   setChatDefaults(prefs ? { home_city: prefs.homeCity || undefined, currency: prefs.currency || undefined } : {})

@@ -10,7 +10,7 @@ from pathlib import Path
 
 class ResponseCache:
     def __init__(self, directory: Path | None = None) -> None:
-        root = Path(__file__).resolve().parents[3]  # the ai/ project folder
+        root = Path(__file__).resolve().parents[3]  # the ai_backend/ project folder
         # Serverless hosts (Vercel) only allow writing to /tmp; CACHE_DIR overrides both.
         default = Path("/tmp/worldtour-cache") if os.environ.get("VERCEL") else root / ".cache"
         self.directory = directory or Path(os.environ.get("CACHE_DIR") or default)

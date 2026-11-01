@@ -2,7 +2,7 @@
 
 WorldTour is a terminal-based multi-agent travel optimization system. You describe a trip in ordinary language. A LangGraph workflow parses the request, checks constraints, and runs only the agents that the trip needs. Deterministic algorithms — not the language model — rank flights, pick hotels, pack the budget, search routes, and schedule days.
 
-This repository is the agentic planning subsystem. It does not include accounts, a web UI, payments, or deployment.
+This folder is the agentic planning subsystem (`ai_backend/` in the WorldTour repository). It runs in the terminal and as a FastAPI web API used by the React site in `../frontend`. Accounts and saved trips live in `../server`; payments are not part of the project.
 
 ## Why this is an optimization problem
 
@@ -111,14 +111,22 @@ ai_backend/
     services/        parser, constraints, scoring, final plan, terminal output
     prompts/         parser instructions
     config/          environment settings
-  scripts/run.py                 interactive application
+    web/             FastAPI app (used by the website)
+    utils/           cache, retries, agent logs
+  app.py                         Vercel entry point
+  scripts/run.py                 interactive terminal application
+  scripts/serve.py               local web API on port 8000
   scripts/inspect_agents.py      agent metadata
   scripts/check_providers.py     live provider check
+  scripts/check_openrouter_key.py, check_openrouter_generation.py   OpenRouter diagnostics
+  scripts/agent_report.py        summarise logs/agents-*.jsonl
+  scripts/measure_day_writer.py  time the AI day-text step
+  tests/                         offline pytest suite
 ```
 
 ## Installation
 
-From the `ai` directory:
+From the `ai_backend` directory:
 
 ```bash
 python -m venv .venv
@@ -152,13 +160,16 @@ See `.env.example`.
 - `AI_DESCRIPTION_TIMEOUT_SECONDS=25` (total time for the AI day text after the timetable is built; days it does not reach keep the built-in summary)
 - `AI_DAYS_PER_REQUEST=2` and `AI_PARALLEL_REQUESTS=4` (the day text is requested in small parallel batches)
 - `AI_DESCRIPTION_RETRIES=1` (one extra try for an empty or unreadable answer; timeouts and rate limits are not retried)
-- `PARSER_LLM_WAIT_SECONDS=8` (how long the chat waits for the background AI parse)
+- `PARSER_LLM_WAIT_SECONDS=20` (how long the chat waits for the AI to read a message)
+- `LLM_COOLDOWN_SECONDS=300` (skip the free LLM this long after it fails or is too slow)
+- `MYMEMORY_EMAIL` (optional; raises the free chat-translation limit)
+- `AGENT_LOG_FILE`, `AGENT_LOG_DIR`, `CACHE_DIR` (optional log and cache locations)
 
 No secrets are stored in source. Responses cached on disk do not include API keys. Debug logs redact request URLs that contain credentials.
 
 ## Checks
 
-There is no automated test suite.
+The automated tests are listed under *Tests* below. Quick manual checks:
 
 ```bash
 python scripts/inspect_agents.py

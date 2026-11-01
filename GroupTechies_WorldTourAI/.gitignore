@@ -4,9 +4,9 @@
 .env.*.local
 
 # Python
-ai/venv/
-ai/.venv/
-ai/logs/
+ai_backend/venv/
+ai_backend/.venv/
+ai_backend/logs/
 __pycache__/
 *.py[cod]
 *.egg-info/
@@ -15,8 +15,8 @@ __pycache__/
 .ruff_cache/
 
 # Runtime data
-ai/.cache/
-ai/trips/
+ai_backend/.cache/
+ai_backend/trips/
 
 # Frontend
 frontend/node_modules/

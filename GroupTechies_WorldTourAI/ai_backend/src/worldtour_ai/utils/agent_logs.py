@@ -5,9 +5,9 @@ provider it used and any fallback), and every call to an outside service (status
 retries, cache hits). A run_id ties together all events of one plan.
 
 Where the lines go:
-  * always stdout, so Vercel → (ai project) → Logs shows them (filter by "agent_failed",
+  * always stdout, so Vercel → (ai_backend project) → Logs shows them (filter by "agent_failed",
     "api_error" or a run_id);
-  * locally also ai/logs/agents-YYYY-MM-DD.jsonl (set AGENT_LOG_FILE=0 to turn the files off,
+  * locally also ai_backend/logs/agents-YYYY-MM-DD.jsonl (set AGENT_LOG_FILE=0 to turn the files off,
     AGENT_LOG_DIR to move them). Vercel's file system is read-only, so no files there.
 
 Summarise the files with:  python scripts/agent_report.py  (see --help).
