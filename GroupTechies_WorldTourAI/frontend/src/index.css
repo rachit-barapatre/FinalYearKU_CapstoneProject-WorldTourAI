@@ -1,0 +1,369 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;
+
+  /* Brand: deep navy, the colour of trust used by airlines and rail */
+  --color-brand-50: #f0f4fa;
+  --color-brand-100: #dde6f3;
+  --color-brand-200: #bccde6;
+  --color-brand-300: #8eaad3;
+  --color-brand-400: #5c80bb;
+  --color-brand-500: #3a61a3;
+  --color-brand-600: #1f4a8c;
+  --color-brand-700: #173b73;
+  --color-brand-800: #13305e;
+  --color-brand-900: #10284d;
+  --color-brand-950: #0a1a33;
+
+  /* Accent: saffron, used sparingly for highlights and calls to action */
+  --color-coral-50: #fff7ec;
+  --color-coral-100: #ffead0;
+  --color-coral-400: #f7a548;
+  --color-coral-500: #ee8a1f;
+  --color-coral-600: #d47212;
+
+  /* Ink for dark surfaces */
+  --color-ink-900: #0a111d;
+  --color-ink-800: #101a2b;
+  --color-ink-700: #18243a;
+
+  --shadow-soft: 0 1px 2px rgb(15 23 42 / 0.05), 0 1px 3px rgb(15 23 42 / 0.04);
+  --shadow-lift: 0 1px 2px rgb(15 23 42 / 0.06), 0 12px 28px -12px rgb(15 23 42 / 0.22);
+
+  --animate-fade-up: fade-up 0.35s ease-out both;
+  --animate-ken-burns: ken-burns 24s ease-in-out infinite alternate;
+  --animate-dash: dash 1.6s linear infinite;
+  --animate-blob: blob 14s ease-in-out infinite;
+  --animate-wave: wave 2.4s ease-in-out 0.6s 2;
+  --animate-pop: pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-shimmer: shimmer 1.6s linear infinite;
+}
+
+@keyframes ken-burns {
+  from { transform: scale(1.04) translate(0, 0); }
+  to { transform: scale(1.14) translate(-2%, -2%); }
+}
+
+@keyframes dash {
+  to { stroke-dashoffset: -28; }
+}
+
+@keyframes blob {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(24px, -18px) scale(1.08); }
+  66% { transform: translate(-18px, 14px) scale(0.95); }
+}
+
+@keyframes wave {
+  0%, 60%, 100% { transform: rotate(0); }
+  10%, 30% { transform: rotate(14deg); }
+  20% { transform: rotate(-8deg); }
+  40% { transform: rotate(-4deg); }
+  50% { transform: rotate(10deg); }
+}
+
+@keyframes pop {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+
+/* Children appear one after another (forms, lists, stat rows). */
+.stagger > * {
+  animation: fade-up 0.45s ease-out both;
+}
+.stagger > *:nth-child(2) { animation-delay: 0.05s; }
+.stagger > *:nth-child(3) { animation-delay: 0.1s; }
+.stagger > *:nth-child(4) { animation-delay: 0.15s; }
+.stagger > *:nth-child(5) { animation-delay: 0.2s; }
+.stagger > *:nth-child(6) { animation-delay: 0.25s; }
+.stagger > *:nth-child(7) { animation-delay: 0.3s; }
+.stagger > *:nth-child(8) { animation-delay: 0.35s; }
+.stagger > *:nth-child(n + 9) { animation-delay: 0.4s; }
+
+/* A light sweep across primary buttons on hover. */
+.btn-shine {
+  position: relative;
+  overflow: hidden;
+}
+.btn-shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 0.28) 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 0.7s ease;
+  pointer-events: none;
+}
+.btn-shine:hover::after {
+  transform: translateX(120%);
+}
+
+/* Cards that lift a little under the pointer. */
+.lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+@media (hover: hover) {
+  .lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lift);
+  }
+}
+
+/* Loading placeholders */
+.skeleton {
+  background: linear-gradient(90deg, rgb(226 232 240) 25%, rgb(241 245 249) 50%, rgb(226 232 240) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+.dark .skeleton {
+  background-image: linear-gradient(90deg, rgb(255 255 255 / 0.05) 25%, rgb(255 255 255 / 0.1) 50%, rgb(255 255 255 / 0.05) 75%);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+:root {
+  color-scheme: light;
+}
+.dark {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  @apply bg-[#f4f6f9] font-sans text-slate-800 antialiased dark:bg-ink-900 dark:text-slate-100;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1, h2, h3, .font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
+}
+
+/* No visible scrollbars anywhere: pages and panels still scroll with the wheel, touch and keyboard. */
+html,
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+html::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.scroll-thin {
+  scrollbar-width: none;
+}
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Soft dotted backdrop for hero sections */
+.bg-grid {
+  background-image: radial-gradient(rgb(148 163 184 / 0.25) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.dark .bg-grid {
+  background-image: radial-gradient(rgb(148 163 184 / 0.12) 1px, transparent 1px);
+}
+
+/* Leaflet sits inside rounded cards */
+.leaflet-container {
+  @apply rounded-2xl;
+  font: inherit;
+}
+
+@keyframes pulse-dot {
+  0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-2px); }
+}
+.typing-dot {
+  animation: pulse-dot 1.2s infinite ease-in-out;
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.float-slow {
+  animation: float-slow 6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Printing: only the travel document (rendered next to #root) is printed. */
+.print-doc {
+  display: none;
+}
+@media print {
+  /* Edge to edge: the travel document adds its own spacing on every page. */
+  @page {
+    size: A4;
+    margin: 0;
+  }
+  html, body {
+    background: white !important;
+  }
+  body.printing #root {
+    display: none !important;
+  }
+  body.printing .print-doc {
+    display: block;
+  }
+  body:not(.printing) header,
+  body:not(.printing) nav,
+  body:not(.printing) aside,
+  .no-print {
+    display: none !important;
+  }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* Pop-up notifications (react-toastify), in WorldTour's look: white card, navy type, a tinted
+   icon badge and a coloured accent bar on the left. */
+:root {
+  --toastify-font-family: var(--font-sans);
+  --toastify-color-light: #ffffff;
+  --toastify-color-dark: var(--color-ink-800);
+  --toastify-text-color-light: var(--color-brand-950);
+  --toastify-text-color-dark: #f1f5f9;
+  --toastify-color-info: var(--color-brand-600);
+  --toastify-color-success: #059669;
+  --toastify-color-warning: var(--color-coral-500);
+  --toastify-color-error: #e11d48;
+  --toastify-color-progress-light: var(--color-brand-500);
+  --toastify-color-progress-dark: var(--color-brand-300);
+  --toastify-toast-width: 380px;
+  --toastify-toast-bd-radius: 14px;
+  --toastify-toast-min-height: 60px;
+  --toastify-z-index: 4000;
+}
+.Toastify__toast.wt-toast {
+  --accent: var(--color-brand-600);
+  position: relative;
+  overflow: hidden;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 12px 12px 16px;
+  border: 1px solid rgb(226 232 240);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.06), 0 18px 40px -16px rgb(16 40 77 / 0.35);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.005em;
+}
+.Toastify__toast.wt-toast::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--accent);
+}
+.Toastify__toast--success.wt-toast { --accent: #059669; }
+.Toastify__toast--error.wt-toast { --accent: #e11d48; }
+.Toastify__toast--warning.wt-toast { --accent: var(--color-coral-500); }
+.Toastify__toast-theme--dark.wt-toast {
+  border-color: rgb(255 255 255 / 0.1);
+  box-shadow: 0 18px 40px -16px rgb(0 0 0 / 0.7);
+}
+.Toastify__toast-icon {
+  width: auto;
+  margin: 0;
+}
+.wt-toast-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  color: var(--color-brand-700);
+  background: var(--color-brand-50);
+}
+.wt-toast-icon--success { color: #047857; background: #ecfdf5; }
+.wt-toast-icon--error { color: #be123c; background: #fff1f2; }
+.wt-toast-icon--warning { color: var(--color-coral-600); background: var(--color-coral-50); }
+.dark .wt-toast-icon { color: var(--color-brand-200); background: rgb(58 97 163 / 0.2); }
+.dark .wt-toast-icon--success { color: #6ee7b7; background: rgb(16 185 129 / 0.15); }
+.dark .wt-toast-icon--error { color: #fda4af; background: rgb(244 63 94 / 0.15); }
+.dark .wt-toast-icon--warning { color: var(--color-coral-400); background: rgb(238 138 31 / 0.15); }
+.wt-toast-close {
+  display: grid;
+  place-items: center;
+  align-self: flex-start;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  color: rgb(148 163 184);
+  transition: background-color 0.15s, color 0.15s;
+}
+.wt-toast-close:hover {
+  color: rgb(51 65 85);
+  background: rgb(241 245 249);
+}
+.dark .wt-toast-close:hover {
+  color: white;
+  background: rgb(255 255 255 / 0.08);
+}
+.Toastify__progress-bar--wrp {
+  height: 3px;
+}
+.Toastify__progress-bar {
+  background: var(--accent) !important;
+  opacity: 0.35 !important;
+}
+@media (max-width: 480px) {
+  .Toastify__toast-container {
+    padding: 0 12px 12px;
+  }
+  .Toastify__toast.wt-toast {
+    margin-bottom: 8px;
+    border-radius: 14px;
+  }
+}
+
+/* Large and very large screens: every size is in rem, so a larger root font scales the whole
+   interface up instead of leaving a small layout floating in empty space. */
+@media (min-width: 1800px) {
+  html { font-size: 17px; }
+}
+@media (min-width: 2200px) {
+  html { font-size: 18.5px; }
+}
+@media (min-width: 3000px) {
+  html { font-size: 22px; }
+}

@@ -1,0 +1,23 @@
+[project]
+name = "worldtour-ai"
+version = "1.0.0"
+description = "WorldTour multi-agent travel optimization system"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "httpx>=0.27",
+    "python-dotenv>=1.0",
+    "langgraph>=0.2.60",
+    "langchain-core>=0.3.0",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

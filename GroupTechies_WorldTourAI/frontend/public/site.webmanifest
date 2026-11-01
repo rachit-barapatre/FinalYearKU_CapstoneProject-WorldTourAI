@@ -1,0 +1,14 @@
+{
+  "name": "WorldTour — AI Trip Planner",
+  "short_name": "WorldTour",
+  "description": "Free AI trip planner: flights, trains, hotels, weather and an hour-by-hour itinerary with a full budget.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f6f9",
+  "theme_color": "#10284d",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

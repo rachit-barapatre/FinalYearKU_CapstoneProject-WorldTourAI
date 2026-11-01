@@ -1,0 +1,31 @@
+# Secrets — never commit real keys
+.env
+.env.local
+.env.*.local
+
+# Python
+ai/venv/
+ai/.venv/
+ai/logs/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Runtime data
+ai/.cache/
+ai/trips/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Accounts server
+server/node_modules/
+
+# Hosting / editors
+.vercel/
+.DS_Store
+.idea/

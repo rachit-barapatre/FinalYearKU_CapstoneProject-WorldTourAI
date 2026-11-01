@@ -1,0 +1,30 @@
+{
+  "name": "worldtour-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WorldTour accounts API: users, saved trips, itinerary history and sharing (Express + MongoDB Atlas + Clerk + Cloudinary).",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=.env src/server.js",
+    "start": "node --env-file-if-exists=.env src/server.js",
+    "test": "node --test --test-concurrency=1 test/*.test.js"
+  },
+  "dependencies": {
+    "@clerk/express": "^1.7.84",
+    "cloudinary": "^2.11.0",
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "express-rate-limit": "^7.5.1",
+    "helmet": "^8.3.0",
+    "mongoose": "^8.24.7",
+    "svix": "^1.99.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "mongodb-memory-server-core": "^10.4.3",
+    "supertest": "^7.3.1"
+  }
+}

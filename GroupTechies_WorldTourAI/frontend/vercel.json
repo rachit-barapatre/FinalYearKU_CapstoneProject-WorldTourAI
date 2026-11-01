@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "trailingSlash": false,
+  "redirects": [
+    { "source": "/trip-planner/:slug.html", "destination": "/trip-planner/:slug", "permanent": true },
+    { "source": "/trip-planner.html", "destination": "/trip-planner", "permanent": true }
+  ],
+  "rewrites": [
+    { "source": "/trip-planner", "destination": "/trip-planner.html" },
+    { "source": "/trip-planner/:slug", "destination": "/trip-planner/:slug.html" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    { "source": "/assets/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] },
+    { "source": "/(og-image.jpg|icon-192.png|icon-512.png|apple-touch-icon.png)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400" }] }
+  ]
+}

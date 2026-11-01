@@ -1,0 +1,7 @@
+venv
+.venv
+.cache
+trips
+.env
+**/__pycache__
+*.pyc
